@@ -565,3 +565,141 @@ Redis的持久化：
 注意： 如果master使用requirepass开启了认证功能，从服务器要使用masterauth <PASSWORD>来连接master服务器使用此密码进行认证；
 
             
+Sentinel:哨兵
+
+    用于管理多个redis服务实现HA；
+        监控master
+        通知
+        自动故障转移；
+
+        流言协议，投票协议，
+
+    程序： 
+        
+        redis-sentinel /path/to/file.conf
+        redis-server /path/to/file.conf --sentinel 
+
+        (1) 服务器自身初始化，运行redis-server中专用于sentinel功能的diamante；
+        (2) 初始化sentinel状态，根据给定的配置文件，初始化监控的master服务器列表；
+        (3) 创建连向master的连接；
+
+    专用配置文件：
+
+        /etc/redis-sentinel.conf 
+            (1) entinel monitor <master-name> <ip> <redis-port> <quorum>
+                sentinel monitor mymaster 127.0.0.1 6379 2
+
+            (2) sentinel down-after-milliseconds <master-name> <milliseconds>
+                sentinel down-after-milliseconds mymaster 30000
+                # 30秒找不到master，则认为其不在线了；
+
+            (3) sentinel parallel-syncs mymaster 1
+
+            (4) sentinel failover-timeout <master-name> <milliseconds>
+                sentinel failover-timeout mymaster 180000
+                # 故障转移的超时时间；
+
+    主管下线，客观下线：
+
+        主管下线： 一个sentinel实例判断出某节点下线；
+
+        客观下线： 多个sentinel节点协商后判断出某节点下线；
+
+    专用命令：
+
+        SENTINEL masters
+        SENTINEL slaves <master name>
+        SENTINEL get-master-addr-by-name <master name>
+        SENTINEL reset
+        SENTINEL failover <master name>
+
+    sentinel节点也应该有多个(奇数个)
+
+
+### Clustering：
+
+    分布式数据库： 通过分片机制进行数据分布，Clustering内的每个节点仅持有数据库的一部分数据。
+
+    redis的集群属于去中心化的集群；
+
+    每个节点持有全局元数据(键值映射)，但仅持有一部分数据；
+
+
+* Twemproxy(Twitter)
+* Codis(豌豆荚)
+* Redis Cluster(官方)
+* Cerberus(芒果TV)
+
+
+* Twemproxy(Twitter)
+
+        代理分片机制；
+        优点： 非常稳定，企业级方案；
+        缺点：
+            单点故障；
+            需依赖第三方软件，如Keepalived；
+            无法平滑地横向扩展；
+            没有后台界面；
+            代理分片机制引入更多的来回次数并提高延迟；
+            单核模式，无法充分利用多核，除非多实例；
+            Twitter官方内部不再继续使用Twemproxy
+
+* Codis(豌豆荚)
+
+        代理分片机制；
+        2014年11月开源；
+        基于Go以及C语言研发；
+        优点：
+            非常稳定，企业级方案；
+            数据自动平衡；
+            高性能；
+            简单的测试显示较Twemproxy快一倍；
+            善用多核CPU
+            简单：
+                没有paxos类的协调机制；
+                没有主从复制；
+            有后台界面
+
+        缺点：
+            代理分片机制引入更多的来回次数并提高延迟；PING - PONG操作；
+            需要第三方软件支持协调机制；
+                目前支持zookeeper 及 Etcd；
+            不支持主从复制，需要另外实现；
+            Codis采用了Proxy的方案，所以必然会带来单机性能的损失，
+                经测试，在不开pipline的情况下，大概会损失40%左右的性能；
+
+* Redis Cluster(官方)
+
+        官方实现
+        需要Redis 3.0 或更高版本；
+
+        优点：
+            无中心的P2P Gossip分散式模式；
+            更少的来回次数并降低延迟；
+            自动于多个Redis节点进行分片；
+            不需要第三方软件支持协调机制；
+
+        缺点：
+            依赖于Redis 3.0 或更高版本；
+            需要时间验证其稳定性；
+            没有后台界面；
+            需要智能客户端；
+            Redis客户端必须支持Redis Cluster结构；
+            较Codis有更多的维护升级成本；
+
+
+* Cerberus(芒果TV)
+
+        优点：
+            数据自动平衡；
+            本身实现了Redis的Smart Client
+            支持读写分离
+
+        缺点：
+            依赖Redis 3.0或更高版本；
+            代理分片机制引入更多的来回次数并增大延迟；
+            需要时间验证其稳定性；
+            没有后台界面；
+
+
+
